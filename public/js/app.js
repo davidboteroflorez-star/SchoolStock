@@ -7,59 +7,28 @@ function formatearFechaHora(fechaRaw, horaRaw) {
   return `${fecha} | ${hora}`;
 }
 
-// Función principal para cambiar de pestaña
+// Lista exacta de las 4 secciones del sistema
+const SECCIONES = ['dashboard', 'inventario', 'prestamo', 'historial'];
+
 window.mostrarSeccion = function(seccionId) {
-  // Buscar todas las secciones (por clase .seccion o por contenedores principales)
-  const secciones = document.querySelectorAll('.seccion, main > div, #content > div');
-  secciones.forEach(sec => {
-    if (sec.id) sec.style.display = 'none';
+  // Ocultar únicamente las 4 secciones conocidas sin tocar el contenedor principal
+  SECCIONES.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   });
 
-  // Intentar mostrar la sección seleccionada
-  const activa = document.getElementById(seccionId);
-  if (activa) {
-    activa.style.display = 'block';
-  } else {
-    // Si el ID varía (ej: 'sec-inventario'), buscar por coincidencia
-    const alternat = Array.from(secciones).find(s => s.id && s.id.toLowerCase().includes(seccionId));
-    if (alternat) alternat.style.display = 'block';
+  // Mostrar la sección solicitada
+  const objetivo = document.getElementById(seccionId);
+  if (objetivo) {
+    objetivo.style.display = 'block';
   }
 
-  // Cargar datos según la pestaña activa
-  if (seccionId.includes('dash')) cargarDashboard();
-  if (seccionId.includes('inven')) cargarInventario();
-  if (seccionId.includes('prest') || seccionId.includes('nuevo')) cargarOpcionesPrestamo();
-  if (seccionId.includes('histor')) cargarHistorial();
+  // Cargar datos correspondientes
+  if (seccionId === 'dashboard') cargarDashboard();
+  if (seccionId === 'inventario') cargarInventario();
+  if (seccionId === 'prestamo') cargarOpcionesPrestamo();
+  if (seccionId === 'historial') cargarHistorial();
 };
-
-// Vinculador automático de eventos en el Menú Lateral
-document.addEventListener('DOMContentLoaded', () => {
-  // Detectar clics en cualquier enlace o botón del menú
-  const enlacesMenu = document.querySelectorAll('#sidebar a, .sidebar a, nav a, button');
-  
-  enlacesMenu.forEach(link => {
-    link.addEventListener('click', (e) => {
-      const texto = link.innerText.toLowerCase();
-      
-      if (texto.includes('dash') || texto.includes('panel')) {
-        e.preventDefault();
-        mostrarSeccion('dashboard');
-      } else if (texto.includes('inven')) {
-        e.preventDefault();
-        mostrarSeccion('inventario');
-      } else if (texto.includes('prest') || texto.includes('nuevo')) {
-        e.preventDefault();
-        mostrarSeccion('prestamo');
-      } else if (texto.includes('histor')) {
-        e.preventDefault();
-        mostrarSeccion('historial');
-      }
-    });
-  });
-
-  // Cargar Dashboard al iniciar
-  mostrarSeccion('dashboard');
-});
 
 // 1. DASHBOARD
 async function cargarDashboard() {
@@ -67,15 +36,15 @@ async function cargarDashboard() {
     const res = await fetch('/api/dashboard');
     const data = await res.json();
     
-    const elemTotal = document.getElementById('dash-total') || document.querySelectorAll('h2, h3')[0];
-    const elemDisp = document.getElementById('dash-disponibles') || document.querySelectorAll('h2, h3')[1];
-    const elemPrest = document.getElementById('dash-prestados') || document.querySelectorAll('h2, h3')[2];
+    const elemTotal = document.getElementById('dash-total');
+    const elemDisp = document.getElementById('dash-disponibles');
+    const elemPrest = document.getElementById('dash-prestados');
 
     if (elemTotal) elemTotal.innerText = data.totalObjetos || 0;
     if (elemDisp) elemDisp.innerText = data.disponibles || 0;
     if (elemPrest) elemPrest.innerText = data.prestados || 0;
   } catch (err) {
-    console.error('Error al cargar dashboard:', err);
+    console.error('Error en dashboard:', err);
   }
 }
 
@@ -84,7 +53,7 @@ async function cargarInventario() {
   try {
     const res = await fetch('/api/objetos');
     const objetos = await res.json();
-    const tbody = document.querySelector('#tabla-inventario, #inventario table tbody, table tbody');
+    const tbody = document.getElementById('tabla-inventario');
     if (!tbody) return;
 
     tbody.innerHTML = objetos.map(obj => `
@@ -98,16 +67,16 @@ async function cargarInventario() {
       </tr>
     `).join('');
   } catch (err) {
-    console.error('Error inventario:', err);
+    console.error('Error en inventario:', err);
   }
 }
 
-// 3. OPCIONES DE PRÉSTAMO
+// 3. PRÉSTAMO
 async function cargarOpcionesPrestamo() {
   try {
     const res = await fetch('/api/objetos');
     const objetos = await res.json();
-    const select = document.querySelector('#prestamo-objeto, select[name="objeto"]');
+    const select = document.getElementById('prestamo-objeto');
     if (!select) return;
 
     select.innerHTML = '<option value="">Seleccione un objeto...</option>' + 
@@ -116,7 +85,7 @@ async function cargarOpcionesPrestamo() {
         .map(o => `<option value="${o.id}">${o.nombre} (${o.codigo}) - Disp: ${o.cantidad_disponible}</option>`)
         .join('');
   } catch (err) {
-    console.error('Error opciones:', err);
+    console.error('Error en opciones de préstamo:', err);
   }
 }
 
@@ -125,7 +94,7 @@ async function cargarHistorial() {
   try {
     const res = await fetch('/api/prestamos');
     const prestamos = await res.json();
-    const tbody = document.querySelectorAll('table tbody')[1] || document.querySelector('#tabla-historial');
+    const tbody = document.getElementById('tabla-historial');
     if (!tbody) return;
 
     tbody.innerHTML = prestamos.map(p => `
@@ -144,7 +113,7 @@ async function cargarHistorial() {
       </tr>
     `).join('');
   } catch (err) {
-    console.error('Error historial:', err);
+    console.error('Error en historial:', err);
   }
 }
 
@@ -156,3 +125,8 @@ window.devolverObjeto = async function(id) {
     cargarHistorial();
   }
 };
+
+// Cargar la pestaña inicial al entrar
+document.addEventListener('DOMContentLoaded', () => {
+  mostrarSeccion('dashboard');
+});
