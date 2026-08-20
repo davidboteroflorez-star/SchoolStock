@@ -1,46 +1,53 @@
-// db.js
-const Database = require('better-sqlite3');
-const db = new Database('database.db');
+const { Pool } = require('pg');
 
-// Habilitar claves foráneas
-db.pragma('foreign_keys = ON');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-// Tabla Objetos
-db.exec(`
-  CREATE TABLE IF NOT EXISTS objetos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    categoria TEXT NOT NULL,
-    codigo TEXT UNIQUE NOT NULL,
-    descripcion TEXT,
-    cantidad_total INTEGER NOT NULL CHECK(cantidad_total >= 0),
-    cantidad_disponible INTEGER NOT NULL CHECK(cantidad_disponible >= 0),
-    estado TEXT DEFAULT 'Disponible',
-    ubicacion TEXT NOT NULL,
-    observaciones TEXT
-  );
-`);
+const initDb = async () => {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS objetos (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        categoria VARCHAR(50) NOT NULL,
+        codigo VARCHAR(50) UNIQUE NOT NULL,
+        descripcion TEXT,
+        cantidad_total INT NOT NULL CHECK(cantidad_total >= 0),
+        cantidad_disponible INT NOT NULL CHECK(cantidad_disponible >= 0),
+        estado VARCHAR(20) DEFAULT 'Disponible',
+        ubicacion VARCHAR(100) NOT NULL,
+        observaciones TEXT
+      );
+    `);
 
-// Tabla Préstamos (Fechas/Horas configuradas con la hora local del servidor)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS prestamos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    estudiante TEXT NOT NULL,
-    documento TEXT NOT NULL,
-    curso TEXT NOT NULL,
-    docente_responsable TEXT,
-    objeto_id INTEGER NOT NULL,
-    cantidad INTEGER NOT NULL DEFAULT 1 CHECK(cantidad > 0),
-    fecha_prestamo DATE DEFAULT (date('now', 'localtime')),
-    hora_prestamo TIME DEFAULT (time('now', 'localtime')),
-    fecha_devolucion DATE,
-    hora_devolucion TIME,
-    estado TEXT DEFAULT 'Prestado',
-    observaciones TEXT,
-    FOREIGN KEY (objeto_id) REFERENCES objetos(id)
-  );
-`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS prestamos (
+        id SERIAL PRIMARY KEY,
+        estudiante VARCHAR(100) NOT NULL,
+        documento VARCHAR(50) NOT NULL,
+        curso VARCHAR(50) NOT NULL,
+        docente_responsable VARCHAR(100),
+        objeto_id INT REFERENCES objetos(id),
+        cantidad INT NOT NULL DEFAULT 1 CHECK(cantidad > 0),
+        fecha_prestamo DATE DEFAULT CURRENT_DATE,
+        hora_prestamo TIME DEFAULT CURRENT_TIME,
+        fecha_devolucion DATE,
+        hora_devolucion TIME,
+        estado VARCHAR(20) DEFAULT 'Prestado',
+        observaciones TEXT
+      );
+    `);
+    console.log('✅ Base de datos Postgres sincronizada.');
+  } catch (err) {
+    console.error('Error al crear tablas:', err);
+  } finally {
+    client.release();
+  }
+};
 
-console.log('✅ Base de datos configurada correctamente en hora local.');
+initDb().catch(console.error);
 
-module.exports = db;
+module.exports = pool;
