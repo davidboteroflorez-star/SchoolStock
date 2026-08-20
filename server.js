@@ -49,7 +49,7 @@ app.post('/api/objetos', async (req, res) => {
   }
 });
 
-// PRÉSTAMOS
+// PRÉSTAMOS (Ajustado con zona horaria de Colombia)
 app.post('/api/prestamos', async (req, res) => {
   const { estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones } = req.body;
   const client = await pool.connect();
@@ -67,7 +67,7 @@ app.post('/api/prestamos', async (req, res) => {
     await client.query('UPDATE objetos SET cantidad_disponible = $1, estado = $2 WHERE id = $3', [nuevaDisp, nuevoEstado, objeto_id]);
     await client.query(
       `INSERT INTO prestamos (estudiante, documento, curso, docente_responsable, objeto_id, cantidad, fecha_prestamo, hora_prestamo, observaciones)
-       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, CURRENT_TIME, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::date, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::time, $7)`,
       [estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones]
     );
 
@@ -81,7 +81,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// DEVOLUCIONES
+// DEVOLUCIONES (Ajustado con zona horaria de Colombia)
 app.post('/api/prestamos/:id/devolver', async (req, res) => {
   const { id } = req.params;
   const client = await pool.connect();
@@ -99,7 +99,11 @@ app.post('/api/prestamos/:id/devolver', async (req, res) => {
     const nuevaDisp = objeto.cantidad_disponible + prestamo.cantidad;
     await client.query('UPDATE objetos SET cantidad_disponible = $1, estado = $2 WHERE id = $3', [nuevaDisp, 'Disponible', objeto.id]);
     await client.query(
-      `UPDATE prestamos SET fecha_devolucion = CURRENT_DATE, hora_devolucion = CURRENT_TIME, estado = 'Devuelto' WHERE id = $1`,
+      `UPDATE prestamos 
+       SET fecha_devolucion = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::date, 
+           hora_devolucion = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::time, 
+           estado = 'Devuelto' 
+       WHERE id = $1`,
       [id]
     );
 
