@@ -16,9 +16,9 @@ app.get('/api/dashboard', async (req, res) => {
     const prestObj = await pool.query("SELECT COUNT(*) AS total FROM prestamos WHERE estado = 'Prestado'");
 
     res.json({
-      totalObjetos: parseInt(totalObj.rows[0].total) || 0,
-      disponibles: parseInt(dispObj.rows[0].total) || 0,
-      prestados: parseInt(prestObj.rows[0].total) || 0
+      totalObjetos: parseInt(totalObj.rows[0]?.total) || 0,
+      disponibles: parseInt(dispObj.rows[0]?.total) || 0,
+      prestados: parseInt(prestObj.rows[0]?.total) || 0
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -45,11 +45,11 @@ app.post('/api/objetos', async (req, res) => {
     );
     res.status(201).json({ message: 'Objeto registrado.' });
   } catch (err) {
-    res.status(400).json({ error: 'El código ya existe o datos inválidos.' });
+    res.status(400).json({ error: 'El código ya existe o los datos son inválidos.' });
   }
 });
 
-// PRÉSTAMOS (Ajustado con zona horaria de Colombia)
+// PRÉSTAMOS (Hora Colombia)
 app.post('/api/prestamos', async (req, res) => {
   const { estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones } = req.body;
   const client = await pool.connect();
@@ -81,7 +81,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// DEVOLUCIONES (Ajustado con zona horaria de Colombia)
+// DEVOLUCIONES
 app.post('/api/prestamos/:id/devolver', async (req, res) => {
   const { id } = req.params;
   const client = await pool.connect();
