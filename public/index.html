@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SchoolStock - Gestión de Inventarios</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f3f4f6; color: #333; display: flex; height: 100vh; overflow: hidden; }
+    
+    /* Sidebar */
+    aside { width: 260px; background-color: #1e3a8a; color: white; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+    aside h1 { font-size: 1.5rem; margin-bottom: 5px; }
+    aside p { font-size: 0.8rem; color: #bfdbfe; margin-bottom: 25px; }
+    nav button { display: block; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; background: transparent; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+    nav button:hover { background-color: #1e40af; }
+    
+    /* Content */
+    main { flex: 1; padding: 30px; overflow-y: auto; }
+    .hidden { display: none !important; }
+    h2 { margin-bottom: 20px; color: #1e293b; }
+
+    /* Alert */
+    #alert-box { padding: 15px; border-radius: 6px; margin-bottom: 20px; color: white; font-weight: bold; }
+    .bg-green { background-color: #16a34a; }
+    .bg-red { background-color: #dc2626; }
+
+    /* Cards */
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid #2563eb; }
+    .card p { font-size: 0.85rem; color: #64748b; }
+    .card h3 { font-size: 2rem; margin-top: 5px; color: #0f172a; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-top: 15px; }
+    th, td { padding: 12px 15px; text-align: left; }
+    th { background-color: #e2e8f0; color: #334155; font-weight: 600; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+    tr:hover { background-color: #f1f5f9; }
+
+    /* Form */
+    form { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .full-width { grid-column: span 2; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+    input:focus, select:focus { border-color: #2563eb; }
+    
+    /* Buttons */
+    .btn { background-color: #2563eb; color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn:hover { background-color: #1d4ed8; }
+    .btn-sm { padding: 5px 10px; font-size: 0.8rem; background-color: #16a34a; }
+    .btn-sm:hover { background-color: #15803d; }
+  </style>
+</head>
+<body>
+
+  <aside>
+    <div>
+      <h1>📦 SchoolStock</h1>
+      <p>Inventario & Préstamos</p>
+      <nav>
+        <button onclick="navigate('dashboard')">📊 Dashboard</button>
+        <button onclick="navigate('inventario')">📦 Inventario</button>
+        <button onclick="navigate('prestamos')">🤝 Nuevo Préstamo</button>
+        <button onclick="navigate('historial')">📜 Historial</button>
+      </nav>
+    </div>
+    <div style="font-size: 0.75rem; color: #bfdbfe; text-align: center;">Colegio Control v1.0</div>
+  </aside>
+
+  <main>
+    <div id="alert-box" class="hidden"></div>
+
+    <section id="view-dashboard">
+      <h2>Panel Principal</h2>
+      <div class="grid-3">
+        <div class="card" style="border-color: #2563eb;">
+          <p>Total Objetos</p>
+          <h3 id="dash-total">0</h3>
+        </div>
+        <div class="card" style="border-color: #16a34a;">
+          <p>Objetos Disponibles</p>
+          <h3 id="dash-disponibles">0</h3>
+        </div>
+        <div class="card" style="border-color: #d97706;">
+          <p>Préstamos Activos</p>
+          <h3 id="dash-prestados">0</h3>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-inventario" class="hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2>Inventario de Objetos</h2>
+        <button onclick="toggleModal(true)" class="btn btn-sm" style="font-size: 0.9rem; padding: 8px 15px;">+ Agregar Objeto</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Disponible / Total</th>
+            <th>Estado</th>
+            <th>Ubicación</th>
+          </tr>
+        </thead>
+        <tbody id="table-inventario"></tbody>
+      </table>
+    </section>
+
+    <section id="view-prestamos" class="hidden">
+      <h2>Registrar Nuevo Préstamo</h2>
+      <form id="form-prestamo" onsubmit="registrarPrestamo(event)">
+        <div>
+          <label>Estudiante</label>
+          <input type="text" id="p-estudiante" required placeholder="Nombre completo">
+        </div>
+        <div>
+          <label>Documento de Identidad</label>
+          <input type="text" id="p-documento" required placeholder="ID o Tarjeta de Identidad">
+        </div>
+        <div>
+          <label>Curso / Grado</label>
+          <input type="text" id="p-curso" required placeholder="Ej: 10-A">
+        </div>
+        <div>
+          <label>Docente Responsable (Opcional)</label>
+          <input type="text" id="p-docente" placeholder="Nombre del docente">
+        </div>
+        <div>
+          <label>Objeto a prestar</label>
+          <select id="p-objeto" required></select>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input type="number" id="p-cantidad" value="1" min="1" required>
+        </div>
+        <div class="full-width">
+          <button type="submit" class="btn" style="width: 100%; padding: 12px;">Confirmar Préstamo</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="view-historial" class="hidden">
+      <h2>Historial & Devoluciones</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Estudiante</th>
+            <th>Objeto</th>
+            <th>Cant.</th>
+            <th>Fecha Préstamo</th>
+            <th>Fecha Devolución</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="table-historial"></tbody>
+      </table>
+    </section>
+
+    <div id="modal-objeto" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+      <div style="background: white; padding: 25px; border-radius: 10px; width: 450px; max-width: 90%;">
+        <h3 style="margin-bottom: 15px;">Agregar Nuevo Objeto</h3>
+        <form id="form-objeto" onsubmit="guardarObjeto(event)" style="display: flex; flex-direction: column; gap: 10px; padding: 0; box-shadow: none;">
+          <div>
+            <label>Código Interno</label>
+            <input type="text" id="o-codigo" required placeholder="Ej: LAP-001">
+          </div>
+          <div>
+            <label>Nombre del Objeto</label>
+            <input type="text" id="o-nombre" required placeholder="Ej: Portátil HP">
+          </div>
+          <div>
+            <label>Categoría</label>
+            <input type="text" id="o-categoria" required placeholder="Ej: Tecnología, Deportes...">
+          </div>
+          <div>
+            <label>Cantidad Total</label>
+            <input type="number" id="o-cantidad" value="1" min="1" required>
+          </div>
+          <div>
+            <label>Ubicación</label>
+            <input type="text" id="o-ubicacion" required placeholder="Ej: Sala 2, Almacén central">
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="submit" class="btn" style="flex: 1;">Guardar</button>
+            <button type="button" onclick="toggleModal(false)" class="btn" style="background: #64748b; flex: 1;">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
