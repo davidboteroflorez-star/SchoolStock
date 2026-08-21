@@ -1,17 +1,17 @@
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const pool = require('./db');
 
 const app = express();
+
 app.use(express.json());
 app.use(cors());
 
 // Servir estáticos desde public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API - DASHBOARD
+// DASHBOARD
 app.get('/api/dashboard', async (req, res) => {
   try {
     const totalObj = await pool.query('SELECT SUM(cantidad_total) AS total FROM objetos');
@@ -28,7 +28,7 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// API - OBJETOS
+// OBJETOS / INVENTARIO
 app.get('/api/objetos', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
@@ -52,7 +52,7 @@ app.post('/api/objetos', async (req, res) => {
   }
 });
 
-// API - PRÉSTAMOS
+// PRÉSTAMOS
 app.post('/api/prestamos', async (req, res) => {
   const { estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones } = req.body;
   const client = await pool.connect();
@@ -84,7 +84,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// API - DEVOLUCIONES
+// DEVOLUCIONES
 app.post('/api/prestamos/:id/devolver', async (req, res) => {
   const { id } = req.params;
   const client = await pool.connect();
@@ -116,7 +116,7 @@ app.post('/api/prestamos/:id/devolver', async (req, res) => {
   }
 });
 
-// API - HISTORIAL
+// HISTORIAL
 app.get('/api/prestamos', async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -131,9 +131,10 @@ app.get('/api/prestamos', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor activo en el puerto ${PORT}`);
-});
+// Solo escuchar en puerto si se ejecuta localmente con Node
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Servidor local en puerto ${PORT}`));
+}
 
 module.exports = app;
