@@ -50,7 +50,7 @@ app.post('/api/objetos', async (req, res) => {
   }
 });
 
-// PRÉSTAMOS (Hora de Colombia America/Bogota)
+// PRÉSTAMOS (Ajustado a NOW() en hora Colombia)
 app.post('/api/prestamos', async (req, res) => {
   const { estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones } = req.body;
   const client = await pool.connect();
@@ -68,7 +68,7 @@ app.post('/api/prestamos', async (req, res) => {
     await client.query('UPDATE objetos SET cantidad_disponible = $1, estado = $2 WHERE id = $3', [nuevaDisp, nuevoEstado, objeto_id]);
     await client.query(
       `INSERT INTO prestamos (estudiante, documento, curso, docente_responsable, objeto_id, cantidad, fecha_prestamo, hora_prestamo, observaciones)
-       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE AT TIME ZONE 'America/Bogota', CURRENT_TIME AT TIME ZONE 'America/Bogota', $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, (NOW() AT TIME ZONE 'America/Bogota')::date, (NOW() AT TIME ZONE 'America/Bogota')::time, $7)`,
       [estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones]
     );
 
@@ -82,7 +82,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// DEVOLUCIONES (Hora de Colombia America/Bogota)
+// DEVOLUCIONES (Ajustado a NOW() en hora Colombia)
 app.post('/api/prestamos/:id/devolver', async (req, res) => {
   const { id } = req.params;
   const client = await pool.connect();
@@ -100,7 +100,7 @@ app.post('/api/prestamos/:id/devolver', async (req, res) => {
     const nuevaDisp = objeto.cantidad_disponible + prestamo.cantidad;
     await client.query('UPDATE objetos SET cantidad_disponible = $1, estado = $2 WHERE id = $3', [nuevaDisp, 'Disponible', objeto.id]);
     await client.query(
-      `UPDATE prestamos SET fecha_devolucion = CURRENT_DATE AT TIME ZONE 'America/Bogota', hora_devolucion = CURRENT_TIME AT TIME ZONE 'America/Bogota', estado = 'Devuelto' WHERE id = $1`,
+      `UPDATE prestamos SET fecha_devolucion = (NOW() AT TIME ZONE 'America/Bogota')::date, hora_devolucion = (NOW() AT TIME ZONE 'America/Bogota')::time, estado = 'Devuelto' WHERE id = $1`,
       [id]
     );
 
@@ -114,16 +114,15 @@ app.post('/api/prestamos/:id/devolver', async (req, res) => {
   }
 });
 
-// HISTORIAL (Limpia el formato de la fecha y hora)
+// HISTORIAL (Entrega campos de fecha y hora limpios por separado para evitar undefined)
 app.get('/api/prestamos', async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT p.id, p.estudiante, p.documento, p.curso, p.docente_responsable, p.objeto_id, p.cantidad, p.estado, p.observaciones,
-             TO_CHAR(p.fecha_prestamo, 'YYYY-MM-DD') || ' ' || TO_CHAR(p.hora_prestamo, 'HH12:MI AM') AS fecha_prestamo,
-             CASE 
-               WHEN p.fecha_devolucion IS NOT NULL THEN TO_CHAR(p.fecha_devolucion, 'YYYY-MM-DD') || ' ' || TO_CHAR(p.hora_devolucion, 'HH12:MI AM')
-               ELSE NULL 
-             END AS fecha_devolucion,
+             TO_CHAR(p.fecha_prestamo, 'YYYY-MM-DD') AS fecha_prestamo,
+             TO_CHAR(p.hora_prestamo, 'HH12:MI AM') AS hora_prestamo,
+             TO_CHAR(p.fecha_devolucion, 'YYYY-MM-DD') AS fecha_devolucion,
+             TO_CHAR(p.hora_devolucion, 'HH12:MI AM') AS hora_devolucion,
              o.nombre AS objeto_nombre, o.codigo AS objeto_codigo
       FROM prestamos p
       JOIN objetos o ON p.objeto_id = o.id
