@@ -10,7 +10,9 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // DASHBOARD
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', async (req, res) => {{
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
   try {
     const totalObj = await pool.query('SELECT SUM(cantidad_total) AS total FROM objetos');
     const dispObj = await pool.query('SELECT SUM(cantidad_disponible) AS total FROM objetos');
