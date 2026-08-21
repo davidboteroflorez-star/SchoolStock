@@ -1,4 +1,4 @@
-// Formateador de Fecha y Hora (Colombia)
+// Formateador limpio de Fecha y Hora en Colombia
 function formatearFechaHora(fechaRaw, horaRaw) {
   if (!fechaRaw) return '—';
   const fecha = String(fechaRaw).split('T')[0];
@@ -7,126 +7,54 @@ function formatearFechaHora(fechaRaw, horaRaw) {
   return `${fecha} | ${hora}`;
 }
 
-// Lista exacta de las 4 secciones del sistema
-const SECCIONES = ['dashboard', 'inventario', 'prestamo', 'historial'];
-
-window.mostrarSeccion = function(seccionId) {
-  // Ocultar únicamente las 4 secciones conocidas sin tocar el contenedor principal
-  SECCIONES.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
-
-  // Mostrar la sección solicitada
-  const objetivo = document.getElementById(seccionId);
-  if (objetivo) {
-    objetivo.style.display = 'block';
-  }
-
-  // Cargar datos correspondientes
-  if (seccionId === 'dashboard') cargarDashboard();
-  if (seccionId === 'inventario') cargarInventario();
-  if (seccionId === 'prestamo') cargarOpcionesPrestamo();
-  if (seccionId === 'historial') cargarHistorial();
-};
-
-// 1. DASHBOARD
+// 1. Cargar datos del Dashboard
 async function cargarDashboard() {
   try {
     const res = await fetch('/api/dashboard');
     const data = await res.json();
     
-    const elemTotal = document.getElementById('dash-total');
-    const elemDisp = document.getElementById('dash-disponibles');
-    const elemPrest = document.getElementById('dash-prestados');
-
-    if (elemTotal) elemTotal.innerText = data.totalObjetos || 0;
-    if (elemDisp) elemDisp.innerText = data.disponibles || 0;
-    if (elemPrest) elemPrest.innerText = data.prestados || 0;
+    // Asigna los valores buscando por IDs comunes o los primeros números
+    const numeros = document.querySelectorAll('h2, h3, .card h2, .card div');
+    if (numeros.length >= 3) {
+      numeros[0].innerText = data.totalObjetos || 0;
+      numeros[1].innerText = data.disponibles || 0;
+      numeros[2].innerText = data.prestados || 0;
+    }
   } catch (err) {
-    console.error('Error en dashboard:', err);
+    console.error('Error al cargar dashboard:', err);
   }
 }
 
-// 2. INVENTARIO
-async function cargarInventario() {
-  try {
-    const res = await fetch('/api/objetos');
-    const objetos = await res.json();
-    const tbody = document.getElementById('tabla-inventario');
-    if (!tbody) return;
-
-    tbody.innerHTML = objetos.map(obj => `
-      <tr>
-        <td><b>${obj.codigo}</b></td>
-        <td>${obj.nombre}</td>
-        <td>${obj.categoria}</td>
-        <td>${obj.cantidad_disponible} / ${obj.cantidad_total}</td>
-        <td><span class="badge ${obj.estado === 'Disponible' ? 'bg-success' : 'bg-danger'}">${obj.estado}</span></td>
-        <td>${obj.ubicacion}</td>
-      </tr>
-    `).join('');
-  } catch (err) {
-    console.error('Error en inventario:', err);
-  }
-}
-
-// 3. PRÉSTAMO
-async function cargarOpcionesPrestamo() {
-  try {
-    const res = await fetch('/api/objetos');
-    const objetos = await res.json();
-    const select = document.getElementById('prestamo-objeto');
-    if (!select) return;
-
-    select.innerHTML = '<option value="">Seleccione un objeto...</option>' + 
-      objetos
-        .filter(o => o.cantidad_disponible > 0)
-        .map(o => `<option value="${o.id}">${o.nombre} (${o.codigo}) - Disp: ${o.cantidad_disponible}</option>`)
-        .join('');
-  } catch (err) {
-    console.error('Error en opciones de préstamo:', err);
-  }
-}
-
-// 4. HISTORIAL
-async function cargarHistorial() {
+// 2. Formatear automáticamente cualquier tabla de historial que exista
+async function corregirFechasTabla() {
   try {
     const res = await fetch('/api/prestamos');
     const prestamos = await res.json();
-    const tbody = document.getElementById('tabla-historial');
-    if (!tbody) return;
-
-    tbody.innerHTML = prestamos.map(p => `
-      <tr>
-        <td><b>${p.estudiante}</b><br><small>${p.curso}</small></td>
-        <td>${p.objeto_nombre}</td>
-        <td>${p.cantidad}</td>
-        <td>${formatearFechaHora(p.fecha_prestamo, p.hora_prestamo)}</td>
-        <td>${formatearFechaHora(p.fecha_devolucion, p.hora_devolucion)}</td>
-        <td><span class="badge ${p.estado === 'Prestado' ? 'bg-warning' : 'bg-secondary'}">${p.estado}</span></td>
-        <td>
-          ${p.estado === 'Prestado' 
-            ? `<button class="btn btn-sm btn-success" onclick="devolverObjeto(${p.id})">Devolver</button>` 
-            : '—'}
-        </td>
-      </tr>
-    `).join('');
+    const tbodies = document.querySelectorAll('table tbody');
+    
+    // Si hay tablas en pantalla, actualizar la que tiene las fechas
+    tbodies.forEach(tbody => {
+      const filas = tbody.querySelectorAll('tr');
+      filas.forEach((fila, index) => {
+        const p = prestamos[index];
+        if (p) {
+          const celdas = fila.querySelectorAll('td');
+          if (celdas.length >= 5) {
+            celdas[3].innerText = formatearFechaHora(p.fecha_prestamo, p.hora_prestamo);
+            if (p.fecha_devolucion) {
+              celdas[4].innerText = formatearFechaHora(p.fecha_devolucion, p.hora_devolucion);
+            }
+          }
+        }
+      });
+    });
   } catch (err) {
-    console.error('Error en historial:', err);
+    console.error('Error al formatear fechas:', err);
   }
 }
 
-window.devolverObjeto = async function(id) {
-  if (!confirm('¿Confirmar devolución?')) return;
-  const res = await fetch(`/api/prestamos/${id}/devolver`, { method: 'POST' });
-  if (res.ok) {
-    alert('Devolución registrada.');
-    cargarHistorial();
-  }
-};
-
-// Cargar la pestaña inicial al entrar
+// Ejecutar al cargar la página
 document.addEventListener('DOMContentLoaded', () => {
-  mostrarSeccion('dashboard');
+  cargarDashboard();
+  corregirFechasTabla();
 });
