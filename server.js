@@ -7,12 +7,12 @@ const pool = require('./db');
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// Servir estáticos desde public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// DASHBOARD
-app.get('/api/dashboard', async (req, res) => {{
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// API - DASHBOARD
+app.get('/api/dashboard', async (req, res) => {
   try {
     const totalObj = await pool.query('SELECT SUM(cantidad_total) AS total FROM objetos');
     const dispObj = await pool.query('SELECT SUM(cantidad_disponible) AS total FROM objetos');
@@ -28,7 +28,7 @@ app.get('/api/dashboard', async (req, res) => {{
   }
 });
 
-// OBJETOS / INVENTARIO
+// API - OBJETOS
 app.get('/api/objetos', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
@@ -52,7 +52,7 @@ app.post('/api/objetos', async (req, res) => {
   }
 });
 
-// PRÉSTAMOS
+// API - PRÉSTAMOS
 app.post('/api/prestamos', async (req, res) => {
   const { estudiante, documento, curso, docente_responsable, objeto_id, cantidad, observaciones } = req.body;
   const client = await pool.connect();
@@ -84,7 +84,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// DEVOLUCIONES
+// API - DEVOLUCIONES
 app.post('/api/prestamos/:id/devolver', async (req, res) => {
   const { id } = req.params;
   const client = await pool.connect();
@@ -116,7 +116,7 @@ app.post('/api/prestamos/:id/devolver', async (req, res) => {
   }
 });
 
-// HISTORIAL
+// API - HISTORIAL
 app.get('/api/prestamos', async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -132,8 +132,8 @@ app.get('/api/prestamos', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-if (require.main === module) {
-  app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
-}
+app.listen(PORT, () => {
+  console.log(`Servidor activo en el puerto ${PORT}`);
+});
 
 module.exports = app;
