@@ -1,5 +1,3 @@
-// public/js/app.js
-
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
 });
@@ -75,10 +73,19 @@ async function loadInventario() {
   `).join('');
 }
 
-// Guardar Objeto en el Inventario
+// Guardar Objeto en el Inventario (Protegido por Clave de Administrador)
 async function guardarObjeto(event) {
   event.preventDefault();
 
+  // 1. Pedir clave mediante prompt
+  const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
+
+  if (!adminPassword) {
+    showAlert("Acceso denegado. Se requiere clave de administrador.", true);
+    return;
+  }
+
+  // 2. Preparar payload
   const payload = {
     codigo: document.getElementById('o-codigo').value,
     nombre: document.getElementById('o-nombre').value,
@@ -89,20 +96,28 @@ async function guardarObjeto(event) {
     observaciones: ''
   };
 
-  const res = await fetch('/api/objetos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  // 3. Enviar petición con la clave en las cabeceras
+  try {
+    const res = await fetch('/api/objetos', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-admin-password': adminPassword
+      },
+      body: JSON.stringify(payload)
+    });
 
-  const result = await res.json();
+    const result = await res.json();
 
-  if (res.ok) {
-    showAlert('Objeto registrado en el inventario con éxito');
-    toggleModal(false);
-    loadInventario();
-  } else {
-    showAlert(result.error || 'Error al registrar el objeto', true);
+    if (res.ok) {
+      showAlert('Objeto registrado en el inventario con éxito');
+      toggleModal(false);
+      loadInventario();
+    } else {
+      showAlert(result.error || 'Clave de administrador incorrecta', true);
+    }
+  } catch (err) {
+    showAlert('Error de conexión con el servidor', true);
   }
 }
 
