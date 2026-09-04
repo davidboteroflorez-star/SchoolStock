@@ -26,17 +26,15 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// OBJETOS / INVENTARIO
-app.get('/api/objetos', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// OBJETOS / INVENTARIO (Protegido por Clave Maestra)
 app.post('/api/objetos', async (req, res) => {
+  const adminPassword = req.headers['x-admin-password'];
+
+  // Validar si la clave ingresada coincide con la variable de entorno
+  if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta o no proporcionada.' });
+  }
+
   const { nombre, categoria, codigo, descripcion, cantidad_total, ubicacion, observaciones } = req.body;
   try {
     await pool.query(
