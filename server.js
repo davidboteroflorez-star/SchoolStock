@@ -170,4 +170,52 @@ app.post('/api/objetos', async (req, res) => {
     console.error(err);
     res.status(400).json({ error: 'Error al registrar objeto (código duplicado o datos inválidos).' });
   }
+});const express = require('express');
+const { Pool } = require('pg');
+const app = express();
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// Conexión a la base de datos de Neon
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // Requerido para Neon en Vercel
 });
+
+// GET: Obtener objetos
+app.get('/api/objetos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al consultar la base de datos' });
+  }
+});
+
+// POST: Agregar objeto con clave maestra
+app.post('/api/objetos', async (req, res) => {
+  const adminPassword = req.headers['x-admin-password'];
+
+  if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  const { codigo, nombre, categoria, cantidad_total, ubicacion, descripcion, observaciones } = req.body;
+
+  try {
+    await pool.query(
+      `INSERT INTO objetos (codigo, nombre, categoria, cantidad_total, cantidad_disponible, ubicacion, descripcion, observaciones)
+       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
+      [codigo, nombre, categoria, cantidad_total, ubicacion, descripcion || '', observaciones || '']
+    );
+    res.status(201).json({ message: 'Objeto registrado exitosamente.' });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: 'Error al registrar el objeto en la base de datos.' });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
