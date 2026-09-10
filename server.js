@@ -226,4 +226,11 @@ app.post('/api/objetos', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));// Exportar para Vercel Serverless Functions
+module.exports = app;
+
+// Escuchar puerto únicamente en entorno local
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
+}
