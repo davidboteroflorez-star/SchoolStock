@@ -148,39 +148,47 @@ app.get('/api/objetos', async (req, res) => {
   }
 });
 
-// POST: Registrar un nuevo objeto (Protegido con Clave Maestra)
+// POST: Agregar objeto con clave maestra de administrador
 app.post('/api/objetos', async (req, res) => {
-  const adminPassword = req.headers['x-admin-password'];
-
-  // Validación de la contraseña de administrador
-  if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Clave de administrador incorrecta o no proporcionada.' });
-  }
-
-  const { codigo, nombre, categoria, cantidad_total, ubicacion, descripcion, observaciones } = req.body;
-
   try {
-    await pool.query(
-      `INSERT INTO objetos (codigo, nombre, categoria, cantidad_total, cantidad_disponible, ubicacion, descripcion, observaciones)
-       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
-      [codigo, nombre, categoria, cantidad_total, ubicacion, descripcion || '', observaciones || '']
-    );
-    res.status(201).json({ message: 'Objeto registrado exitosamente.' });
+    const adminPassword = req.headers['x-admin-password'];
+    const expectedPassword = process.env.ADMIN_PASSWORD;
+
+    // Control de seguridad del servidor
+    if (!expectedPassword) {
+      console.error("ADMIN_PASSWORD no está definida en las variables de entorno.");
+      return res.status(500).json({ error: 'Configuración de servidor incompleta (falta ADMIN_PASSWORD).' });
+    }
+
+    if (!adminPassword || adminPassword !== expectedPassword) {
+      return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+    }
+
+    const { codigo, nombre, categoria, cantidad_total, ubicacion, descripcion, observaciones } = req.body;
+
+    const cantTotal = parseInt(cantidad_total) || 1;
+
+    // Inserción en la base de datos con valores por defecto seguros
+    const query = `
+      INSERT INTO objetos (codigo, nombre, categoria, cantidad_total, cantidad_disponible, ubicacion, estado)
+      VALUES ($1, $2, $3, $4, $4, $5, 'Disponible')
+      RETURNING *;
+    `;
+    const values = [
+      codigo || `COD-${Date.now()}`,
+      nombre || 'Sin nombre',
+      categoria || 'General',
+      cantTotal,
+      ubicacion || 'Almacén'
+    ];
+
+    const result = await pool.query(query, values);
+    res.status(201).json({ message: 'Objeto registrado exitosamente.', objeto: result.rows[0] });
+
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: 'Error al registrar objeto (código duplicado o datos inválidos).' });
+    console.error("Error al insertar objeto en PostgreSQL:", err);
+    res.status(500).json({ error: 'Error en la base de datos: ' + err.message });
   }
-});const express = require('express');
-const { Pool } = require('pg');
-const app = express();
-
-app.use(express.json());
-app.use(express.static('public'));
-
-// Conexión a la base de datos de Neon
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Requerido para Neon en Vercel
 });
 
 // GET: Obtener objetos
