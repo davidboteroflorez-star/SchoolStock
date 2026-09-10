@@ -1,5 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
+
+  // Asignar el evento submit al formulario de objetos al cargar la página
+  const formObjeto = document.getElementById('form-objeto');
+  if (formObjeto) {
+    formObjeto.addEventListener('submit', guardarObjeto);
+  }
 });
 
 // Navegación Tab Single Page Application
@@ -19,6 +25,7 @@ function navigate(viewName) {
 // Mostrar Alertas del Sistema
 function showAlert(message, isError = false) {
   const box = document.getElementById('alert-box');
+  if (!box) return;
   box.className = `bg-${isError ? 'red' : 'green'}`;
   box.style.backgroundColor = isError ? '#dc2626' : '#16a34a';
   box.textContent = message;
@@ -33,7 +40,8 @@ function toggleModal(show) {
     modal.classList.remove('hidden');
   } else {
     modal.classList.add('hidden');
-    document.getElementById('form-objeto').reset();
+    const form = document.getElementById('form-objeto');
+    if (form) form.reset();
   }
 }
 
@@ -43,9 +51,9 @@ async function loadDashboard() {
     const res = await fetch('/api/dashboard');
     const data = await res.json();
 
-    document.getElementById('dash-total').textContent = data.totalObjetos;
-    document.getElementById('dash-disponibles').textContent = data.disponibles;
-    document.getElementById('dash-prestados').textContent = data.prestados;
+    document.getElementById('dash-total').textContent = data.totalObjetos || 0;
+    document.getElementById('dash-disponibles').textContent = data.disponibles || 0;
+    document.getElementById('dash-prestados').textContent = data.prestados || 0;
   } catch (err) {
     console.error("Error al cargar dashboard", err);
   }
@@ -53,31 +61,49 @@ async function loadDashboard() {
 
 // Cargar Inventario
 async function loadInventario() {
-  const res = await fetch('/api/objetos');
-  const data = await res.json();
-  const tbody = document.getElementById('table-inventario');
-  
-  tbody.innerHTML = data.map(item => `
-    <tr>
-      <td style="font-family: monospace; font-weight: bold;">${item.codigo}</td>
-      <td style="font-weight: 600;">${item.nombre}</td>
-      <td>${item.categoria}</td>
-      <td style="text-align: center;">${item.cantidad_disponible} / ${item.cantidad_total}</td>
-      <td>
-        <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; background: ${item.cantidad_disponible > 0 ? '#dcfce7' : '#fee2e2'}; color: ${item.cantidad_disponible > 0 ? '#166534' : '#991b1b'};">
-          ${item.estado}
-        </span>
-      </td>
-      <td style="color: #64748b;">${item.ubicacion}</td>
-    </tr>
-  `).join('');
-}
+  try {
+    const res = await fetch('/api/objetos');
+    const data = await res.json();
+    const tbody = document.getElementById('table-inventario');
 
-// Guardar Objeto en el Inventario (Protegido por Clave de Administrador)
+    if (!tbody) return;
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px;">No hay objetos registrados en el inventario</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map(item => {
+      // Soporte flexible para nombres de columnas en la DB (snake_case)
+      const cantTotal = item.cantidad_total ?? item.cantidadtotal ?? 0;
+      const cantDisp = item.cantidad_disponible ?? item.cantidaddisponible ?? cantTotal;
+      const estadoCalculado = cantDisp > 0 ? 'Disponible' : 'Agotado';
+      const estado = item.estado || estadoCalculado;
+
+      return `
+        <tr>
+          <td style="font-family: monospace; font-weight: bold;">${item.codigo || '—'}</td>
+          <td style="font-weight: 600;">${item.nombre || '—'}</td>
+          <td>${item.categoria || '—'}</td>
+          <td style="text-align: center;">${cantDisp} / ${cantTotal}</td>
+          <td style="text-align: center;">
+            <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; background: ${cantDisp > 0 ? '#dcfce7' : '#fee2e2'}; color: ${cantDisp > 0 ? '#166534' : '#991b1b'};">
+              ${estado}
+            </span>
+          </td>
+          <td style="color: #64748b;">${item.ubicacion || '—'}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error("Error al cargar inventario:", err);
+  }
+}
+// Guardar Objeto en el Inventario (Protegido por Clave)
 async function guardarObjeto(event) {
   event.preventDefault();
 
-  // 1. Pedir clave mediante prompt
+  // 1. Pedir clave de administrador con prompt
   const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
 
   if (!adminPassword) {
@@ -85,18 +111,18 @@ async function guardarObjeto(event) {
     return;
   }
 
-  // 2. Preparar payload
+  // 2. Preparar el payload con los IDs del modal (o-codigo, o-nombre, etc.)
   const payload = {
-    codigo: document.getElementById('o-codigo').value,
-    nombre: document.getElementById('o-nombre').value,
-    categoria: document.getElementById('o-categoria').value,
-    cantidad_total: parseInt(document.getElementById('o-cantidad').value),
-    ubicacion: document.getElementById('o-ubicacion').value,
+    codigo: document.getElementById('o-codigo')?.value || '',
+    nombre: document.getElementById('o-nombre')?.value || '',
+    categoria: document.getElementById('o-categoria')?.value || '',
+    cantidad_total: parseInt(document.getElementById('o-cantidad')?.value || '1'),
+    ubicacion: document.getElementById('o-ubicacion')?.value || '',
     descripcion: '',
     observaciones: ''
   };
 
-  // 3. Enviar petición con la clave en las cabeceras
+  // 3. Enviar a la API con la clave en el header
   try {
     const res = await fetch('/api/objetos', {
       method: 'POST',
@@ -113,6 +139,7 @@ async function guardarObjeto(event) {
       showAlert('Objeto registrado en el inventario con éxito');
       toggleModal(false);
       loadInventario();
+      loadDashboard();
     } else {
       showAlert(result.error || 'Clave de administrador incorrecta', true);
     }

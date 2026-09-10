@@ -133,3 +133,41 @@ app.get('/api/prestamos', async (req, res) => {
 });
 
 module.exports = app;
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
+});// GET: Obtener todos los objetos del inventario
+app.get('/api/objetos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener los objetos' });
+  }
+});
+
+// POST: Registrar un nuevo objeto (Protegido con Clave Maestra)
+app.post('/api/objetos', async (req, res) => {
+  const adminPassword = req.headers['x-admin-password'];
+
+  // Validación de la contraseña de administrador
+  if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta o no proporcionada.' });
+  }
+
+  const { codigo, nombre, categoria, cantidad_total, ubicacion, descripcion, observaciones } = req.body;
+
+  try {
+    await pool.query(
+      `INSERT INTO objetos (codigo, nombre, categoria, cantidad_total, cantidad_disponible, ubicacion, descripcion, observaciones)
+       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
+      [codigo, nombre, categoria, cantidad_total, ubicacion, descripcion || '', observaciones || '']
+    );
+    res.status(201).json({ message: 'Objeto registrado exitosamente.' });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: 'Error al registrar objeto (código duplicado o datos inválidos).' });
+  }
+});
