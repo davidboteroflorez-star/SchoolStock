@@ -103,7 +103,7 @@ async function loadInventario() {
 async function guardarObjeto(event) {
   event.preventDefault();
 
-  // 1. Pedir clave de administrador con prompt
+  // 1. Pedir clave de administrador UNA SOLA VEZ
   const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
 
   if (!adminPassword) {
@@ -111,6 +111,44 @@ async function guardarObjeto(event) {
     return;
   }
 
+  // 2. Extraer los datos del formulario
+  const objetoData = {
+    codigo: document.getElementById('o-codigo').value,
+    nombre: document.getElementById('o-nombre').value,
+    categoria: document.getElementById('o-categoria').value,
+    cantidad_total: parseInt(document.getElementById('o-cantidad').value) || 1,
+    ubicacion: document.getElementById('o-ubicacion').value
+  };
+
+  try {
+    // 3. Enviar la petición a la API enviando la clave en los headers
+    const response = await fetch('/api/objetos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-password': adminPassword
+      },
+      body: JSON.stringify(objetoData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al guardar el objeto');
+    }
+
+    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar la tabla/dashboard
+    showAlert("Objeto registrado exitosamente.");
+    document.getElementById('form-objeto').reset();
+    if (typeof toggleModal === 'function') toggleModal(false);
+    if (typeof cargarObjetos === 'function') cargarObjetos();
+    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+
+  } catch (error) {
+    console.error("Error en guardarObjeto:", error);
+    showAlert(error.message, true);
+  }
+}
   // 2. Preparar el payload con los IDs del modal (o-codigo, o-nombre, etc.)
   const payload = {
     codigo: document.getElementById('o-codigo')?.value || '',
