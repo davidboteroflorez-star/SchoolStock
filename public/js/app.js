@@ -100,6 +100,7 @@ async function loadInventario() {
   }
 }
 // Guardar Objeto en el Inventario (Protegido por Clave)
+// Guardar Objeto en el Inventario (Protegido por Clave)
 async function guardarObjeto(event) {
   event.preventDefault();
 
@@ -113,11 +114,11 @@ async function guardarObjeto(event) {
 
   // 2. Extraer los datos del formulario
   const objetoData = {
-    codigo: document.getElementById('o-codigo').value,
-    nombre: document.getElementById('o-nombre').value,
-    categoria: document.getElementById('o-categoria').value,
-    cantidad_total: parseInt(document.getElementById('o-cantidad').value) || 1,
-    ubicacion: document.getElementById('o-ubicacion').value
+    codigo: document.getElementById('o-codigo')?.value || '',
+    nombre: document.getElementById('o-nombre')?.value || '',
+    categoria: document.getElementById('o-categoria')?.value || '',
+    cantidad_total: parseInt(document.getElementById('o-cantidad')?.value || '1'),
+    ubicacion: document.getElementById('o-ubicacion')?.value || ''
   };
 
   try {
@@ -137,69 +138,41 @@ async function guardarObjeto(event) {
       throw new Error(data.error || 'Error al guardar el objeto');
     }
 
-    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar la tabla/dashboard
+    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar las tablas
     showAlert("Objeto registrado exitosamente.");
     document.getElementById('form-objeto').reset();
     if (typeof toggleModal === 'function') toggleModal(false);
     if (typeof cargarObjetos === 'function') cargarObjetos();
+    if (typeof loadInventario === 'function') loadInventario();
     if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+    if (typeof loadDashboard === 'function') loadDashboard();
 
   } catch (error) {
     console.error("Error en guardarObjeto:", error);
     showAlert(error.message, true);
   }
 }
-  // 2. Preparar el payload con los IDs del modal (o-codigo, o-nombre, etc.)
-  const payload = {
-    codigo: document.getElementById('o-codigo')?.value || '',
-    nombre: document.getElementById('o-nombre')?.value || '',
-    categoria: document.getElementById('o-categoria')?.value || '',
-    cantidad_total: parseInt(document.getElementById('o-cantidad')?.value || '1'),
-    ubicacion: document.getElementById('o-ubicacion')?.value || '',
-    descripcion: '',
-    observaciones: ''
-  };
-
-  // 3. Enviar a la API con la clave en el header
-  try {
-    const res = await fetch('/api/objetos', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-admin-password': adminPassword
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const result = await res.json();
-
-    if (res.ok) {
-      showAlert('Objeto registrado en el inventario con éxito');
-      toggleModal(false);
-      loadInventario();
-      loadDashboard();
-    } else {
-      showAlert(result.error || 'Clave de administrador incorrecta', true);
-    }
-  } catch (err) {
-    showAlert('Error de conexión con el servidor', true);
-  }
-}
 
 // Cargar Selección de Objetos Disponibles
 async function loadSelectObjetos() {
-  const res = await fetch('/api/objetos');
-  const data = await res.json();
-  const select = document.getElementById('p-objeto');
-  
-  const disponibles = data.filter(o => o.cantidad_disponible > 0);
+  try {
+    const res = await fetch('/api/objetos');
+    const data = await res.json();
+    const select = document.getElementById('p-objeto');
 
-  if (disponibles.length === 0) {
-    select.innerHTML = '<option value="">-- No hay objetos disponibles --</option>';
-  } else {
-    select.innerHTML = disponibles
-      .map(o => `<option value="${o.id}">${o.nombre} (Disponibles: ${o.cantidad_disponible})</option>`)
-      .join('');
+    if (!select) return;
+
+    const disponibles = Array.isArray(data) ? data.filter(o => o.cantidad_disponible > 0) : [];
+
+    if (disponibles.length === 0) {
+      select.innerHTML = '<option value="">-- No hay objetos disponibles --</option>';
+    } else {
+      select.innerHTML = disponibles
+        .map(o => `<option value="${o.id}">${o.nombre} (Disponibles: ${o.cantidad_disponible})</option>`)
+        .join('');
+    }
+  } catch (err) {
+    console.error("Error al cargar objetos en select:", err);
   }
 }
 
