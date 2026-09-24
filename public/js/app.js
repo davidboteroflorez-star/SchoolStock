@@ -1,110 +1,79 @@
-document.addEventListener('DOMContentLoaded', () => {
-  loadDashboard();
+// Variable para rastrear la pestaña activa
+let currentTab = 'dashboard';
 
-  // Asignar el evento submit al formulario de objetos al cargar la página
-  const formObjeto = document.getElementById('form-objeto');
-  if (formObjeto) {
-    formObjeto.addEventListener('submit', guardarObjeto);
-  }
-});
+// Navegación entre secciones (Tabs)
+function navigate(tabId) {
+  currentTab = tabId;
 
-// Navegación Tab Single Page Application
-function navigate(viewName) {
-  const views = ['dashboard', 'inventario', 'prestamos', 'historial'];
-  views.forEach(v => {
-    document.getElementById(`view-${v}`).classList.add('hidden');
+  // Ocultar todas las secciones
+  document.querySelectorAll('.tab-content').forEach(section => {
+    section.style.display = 'none';
   });
-  document.getElementById(`view-${viewName}`).classList.remove('hidden');
 
-  if (viewName === 'dashboard') loadDashboard();
-  if (viewName === 'inventario') loadInventario();
-  if (viewName === 'prestamos') loadSelectObjetos();
-  if (viewName === 'historial') loadHistorial();
+  // Remover clase activa de todos los botones
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  // Mostrar la sección seleccionada
+  const selectedTab = document.getElementById(tabId);
+  if (selectedTab) {
+    selectedTab.style.display = 'block';
+  }
+
+  // Activar el botón correspondiente
+  const selectedBtn = document.getElementById(`btn-${tabId}`);
+  if (selectedBtn) {
+    selectedBtn.classList.add('active');
+  }
+
+  // Cargar datos según la pestaña activa
+  if (tabId === 'dashboard') {
+    if (typeof loadDashboard === 'function') loadDashboard();
+    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+  } else if (tabId === 'inventario') {
+    if (typeof loadInventario === 'function') loadInventario();
+    if (typeof cargarObjetos === 'function') cargarObjetos();
+  } else if (tabId === 'prestamo') {
+    if (typeof loadSelectObjetos === 'function') loadSelectObjetos();
+  } else if (tabId === 'historial') {
+    if (typeof loadHistorial === 'function') loadHistorial();
+  }
 }
 
-// Mostrar Alertas del Sistema
+// Mostrar avisos/alertas en pantalla
 function showAlert(message, isError = false) {
-  const box = document.getElementById('alert-box');
-  if (!box) return;
-  box.className = `bg-${isError ? 'red' : 'green'}`;
-  box.style.backgroundColor = isError ? '#dc2626' : '#16a34a';
-  box.textContent = message;
-  box.classList.remove('hidden');
-  setTimeout(() => box.classList.add('hidden'), 4000);
+  const alertBox = document.getElementById('alert-box');
+  if (!alertBox) {
+    alert(message);
+    return;
+  }
+  alertBox.textContent = message;
+  alertBox.className = isError ? 'alert alert-error' : 'alert alert-success';
+  alertBox.style.display = 'block';
+
+  setTimeout(() => {
+    alertBox.style.display = 'none';
+  }, 4000);
 }
 
-// Abrir / Cerrar Modal de Registro
+// Control del Modal para Agregar Objeto
 function toggleModal(show) {
   const modal = document.getElementById('modal-objeto');
-  if (show) {
-    modal.classList.remove('hidden');
-  } else {
-    modal.classList.add('hidden');
-    const form = document.getElementById('form-objeto');
-    if (form) form.reset();
+  if (modal) {
+    modal.style.display = show ? 'flex' : 'none';
   }
 }
 
-// Cargar Métricas Dashboard
-async function loadDashboard() {
-  try {
-    const res = await fetch('/api/dashboard');
-    const data = await res.json();
+// -------------------------------------------------------------
+// GESTIÓN DE OBJETOS (INVENTARIO)
+// -------------------------------------------------------------
 
-    document.getElementById('dash-total').textContent = data.totalObjetos || 0;
-    document.getElementById('dash-disponibles').textContent = data.disponibles || 0;
-    document.getElementById('dash-prestados').textContent = data.prestados || 0;
-  } catch (err) {
-    console.error("Error al cargar dashboard", err);
-  }
-}
-
-// Cargar Inventario
-async function loadInventario() {
-  try {
-    const res = await fetch('/api/objetos');
-    const data = await res.json();
-    const tbody = document.getElementById('table-inventario');
-
-    if (!tbody) return;
-    
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px;">No hay objetos registrados en el inventario</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.map(item => {
-      // Soporte flexible para nombres de columnas en la DB (snake_case)
-      const cantTotal = item.cantidad_total ?? item.cantidadtotal ?? 0;
-      const cantDisp = item.cantidad_disponible ?? item.cantidaddisponible ?? cantTotal;
-      const estadoCalculado = cantDisp > 0 ? 'Disponible' : 'Agotado';
-      const estado = item.estado || estadoCalculado;
-
-      return `
-        <tr>
-          <td style="font-family: monospace; font-weight: bold;">${item.codigo || '—'}</td>
-          <td style="font-weight: 600;">${item.nombre || '—'}</td>
-          <td>${item.categoria || '—'}</td>
-          <td style="text-align: center;">${cantDisp} / ${cantTotal}</td>
-          <td style="text-align: center;">
-            <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; background: ${cantDisp > 0 ? '#dcfce7' : '#fee2e2'}; color: ${cantDisp > 0 ? '#166534' : '#991b1b'};">
-              ${estado}
-            </span>
-          </td>
-          <td style="color: #64748b;">${item.ubicacion || '—'}</td>
-        </tr>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error("Error al cargar inventario:", err);
-  }
-}
-// Guardar Objeto en el Inventario (Protegido por Clave)
-// Guardar Objeto en el Inventario (Protegido por Clave)
+// Guardar Objeto en el Inventario (Protegido por Clave - Pide clave 1 SOLA VEZ)
 async function guardarObjeto(event) {
   event.preventDefault();
 
-  // 1. Pedir clave de administrador UNA SOLA VEZ
+  // 1. Pedir clave de administrador una sola vez
   const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
 
   if (!adminPassword) {
@@ -122,7 +91,7 @@ async function guardarObjeto(event) {
   };
 
   try {
-    // 3. Enviar la petición a la API enviando la clave en los headers
+    // 3. Enviar la petición a la API enviando la clave en el header x-admin-password
     const response = await fetch('/api/objetos', {
       method: 'POST',
       headers: {
@@ -138,14 +107,16 @@ async function guardarObjeto(event) {
       throw new Error(data.error || 'Error al guardar el objeto');
     }
 
-    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar las tablas
+    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar la tabla/dashboard
     showAlert("Objeto registrado exitosamente.");
     document.getElementById('form-objeto').reset();
-    if (typeof toggleModal === 'function') toggleModal(false);
-    if (typeof cargarObjetos === 'function') cargarObjetos();
+    toggleModal(false);
+
+    // Refrescar vistas
     if (typeof loadInventario === 'function') loadInventario();
-    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+    if (typeof cargarObjetos === 'function') cargarObjetos();
     if (typeof loadDashboard === 'function') loadDashboard();
+    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
 
   } catch (error) {
     console.error("Error en guardarObjeto:", error);
@@ -153,7 +124,70 @@ async function guardarObjeto(event) {
   }
 }
 
-// Cargar Selección de Objetos Disponibles
+// Cargar tabla de Inventario
+async function loadInventario() {
+  try {
+    const res = await fetch('/api/objetos');
+    const data = await res.json();
+    const tbody = document.getElementById('tabla-inventario');
+    if (!tbody) return;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay objetos registrados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(o => `
+      <tr>
+        <td><strong>${o.codigo}</strong></td>
+        <td>${o.nombre}</td>
+        <td><span class="badge">${o.categoria}</span></td>
+        <td>${o.cantidad_disponible} / ${o.cantidad_total}</td>
+        <td>${o.ubicacion}</td>
+        <td>
+          <button class="btn btn-sm" onclick="eliminarObjeto(${o.id})" style="background: #ef4444;">Eliminar</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error("Error al cargar inventario:", err);
+  }
+}
+
+// Función alias para compatibilidad
+async function cargarObjetos() {
+  await loadInventario();
+}
+
+// Eliminar un objeto del inventario
+async function eliminarObjeto(id) {
+  const adminPassword = prompt("Ingrese la clave de administrador para eliminar:");
+  if (!adminPassword) return;
+
+  try {
+    const res = await fetch(`/api/objetos/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': adminPassword }
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAlert('Objeto eliminado con éxito');
+      loadInventario();
+      loadDashboard();
+    } else {
+      showAlert(data.error || 'Error al eliminar', true);
+    }
+  } catch (err) {
+    showAlert('Error de conexión', true);
+  }
+}
+
+// -------------------------------------------------------------
+// GESTIÓN DE PRÉSTAMOS
+// -------------------------------------------------------------
+
+// Cargar Selección de Objetos Disponibles en el Formulario de Préstamo
 async function loadSelectObjetos() {
   try {
     const res = await fetch('/api/objetos');
@@ -179,77 +213,133 @@ async function loadSelectObjetos() {
 // Registrar un Préstamo
 async function registrarPrestamo(event) {
   event.preventDefault();
-  const objetoId = document.getElementById('p-objeto').value;
 
-  if (!objetoId) {
-    showAlert('Por favor selecciona un objeto válido', true);
-    return;
-  }
-
-  const payload = {
-    estudiante: document.getElementById('p-estudiante').value,
-    documento: document.getElementById('p-documento').value,
-    curso: document.getElementById('p-curso').value,
-    docente_responsable: document.getElementById('p-docente').value,
-    objeto_id: objetoId,
-    cantidad: parseInt(document.getElementById('p-cantidad').value)
+  const prestamoData = {
+    objeto_id: document.getElementById('p-objeto')?.value,
+    solicitante: document.getElementById('p-solicitante')?.value,
+    rol: document.getElementById('p-rol')?.value,
+    fecha_prestamo: document.getElementById('p-fecha')?.value || new Date().toISOString().split('T')[0]
   };
 
-  const res = await fetch('/api/prestamos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await fetch('/api/prestamos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prestamoData)
+    });
 
-  const result = await res.json();
+    const data = await res.json();
 
-  if (res.ok) {
-    showAlert('Préstamo registrado exitosamente');
-    document.getElementById('form-prestamo').reset();
-    navigate('historial');
-  } else {
-    showAlert(result.error, true);
+    if (res.ok) {
+      showAlert('Préstamo registrado exitosamente');
+      document.getElementById('form-prestamo').reset();
+      navigate('historial');
+    } else {
+      showAlert(data.error || 'Error al registrar préstamo', true);
+    }
+  } catch (err) {
+    showAlert('Error de conexión al registrar préstamo', true);
   }
 }
 
-// Cargar Historial y Botón Devolver
+// Registrar Devolución
+async function registrarDevolucion(id) {
+  try {
+    const res = await fetch(`/api/prestamos/${id}/devolucion`, {
+      method: 'PUT'
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showAlert('Devolución registrada exitosamente');
+      loadHistorial();
+      loadDashboard();
+    } else {
+      showAlert(data.error || 'Error al procesar devolución', true);
+    }
+  } catch (err) {
+    showAlert('Error de conexión con el servidor', true);
+  }
+}
+
+// Cargar Historial de Préstamos
 async function loadHistorial() {
-  const res = await fetch('/api/prestamos');
-  const data = await res.json();
-  const tbody = document.getElementById('table-historial');
+  try {
+    const res = await fetch('/api/prestamos');
+    const data = await res.json();
+    const tbody = document.getElementById('tabla-historial');
+    if (!tbody) return;
 
-  tbody.innerHTML = data.map(p => `
-    <tr>
-      <td><b>${p.estudiante}</b><br><small style="color:#64748b">${p.curso}</small></td>
-      <td>${p.objeto_nombre}</td>
-      <td style="text-align: center;">${p.cantidad}</td>
-      <td style="font-size: 0.85rem;">${p.fecha_prestamo} ${p.hora_prestamo}</td>
-      <td style="font-size: 0.85rem;">${p.fecha_devolucion ? `${p.fecha_devolucion} ${p.hora_devolucion}` : '—'}</td>
-      <td style="text-align: center;">
-        <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; background: ${p.estado === 'Devuelto' ? '#e2e8f0' : '#fef3c7'}; color: ${p.estado === 'Devuelto' ? '#475569' : '#92400e'};">
-          ${p.estado}
-        </span>
-      </td>
-      <td style="text-align: center;">
-        ${p.estado === 'Prestado' ? `
-          <button onclick="devolverObjeto(${p.id})" class="btn btn-sm">
-            Devolver
-          </button>
-        ` : '—'}
-      </td>
-    </tr>
-  `).join('');
-}
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay préstamos registrados.</td></tr>';
+      return;
+    }
 
-// Procesar Devolución de Objeto
-async function devolverObjeto(prestamoId) {
-  const res = await fetch(`/api/prestamos/${prestamoId}/devolver`, { method: 'POST' });
-  const result = await res.json();
-
-  if (res.ok) {
-    showAlert('Devolución procesada correctamente');
-    loadHistorial();
-  } else {
-    showAlert(result.error, true);
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${p.objeto_nombre || 'N/A'}</td>
+        <td>${p.solicitante} (${p.rol})</td>
+        <td>${p.fecha_prestamo ? new Date(p.fecha_prestamo).toLocaleDateString() : 'N/A'}</td>
+        <td>${p.fecha_devolucion ? new Date(p.fecha_devolucion).toLocaleDateString() : 'Pendiente'}</td>
+        <td>
+          <span class="badge ${p.estado === 'Devuelto' ? 'badge-success' : 'badge-warning'}">
+            ${p.estado}
+          </span>
+        </td>
+        <td>
+          ${p.estado === 'Activo' 
+            ? `<button class="btn btn-sm" onclick="registrarDevolucion(${p.id})">Devolver</button>` 
+            : '-'
+          }
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error("Error al cargar historial:", err);
   }
 }
+
+// -------------------------------------------------------------
+// DASHBOARD / ESTADÍSTICAS
+// -------------------------------------------------------------
+
+// Cargar Métricas en el Dashboard
+async function loadDashboard() {
+  try {
+    const resObj = await fetch('/api/objetos');
+    const objetos = await resObj.json();
+
+    const resPres = await fetch('/api/prestamos');
+    const prestamos = await resPres.json();
+
+    if (Array.isArray(objetos)) {
+      const total = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_total) || 0), 0);
+      const disp = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_disponible) || 0), 0);
+      
+      const elTotal = document.getElementById('stat-total');
+      const elDisp = document.getElementById('stat-disponibles');
+      if (elTotal) elTotal.textContent = total;
+      if (elDisp) elDisp.textContent = disp;
+    }
+
+    if (Array.isArray(prestamos)) {
+      const activos = prestamos.filter(p => p.estado === 'Activo').length;
+      const elActivos = document.getElementById('stat-activos');
+      if (elActivos) elActivos.textContent = activos;
+    }
+  } catch (err) {
+    console.error("Error al cargar dashboard:", err);
+  }
+}
+
+// Alias de compatibilidad
+async function cargarEstadisticas() {
+  await loadDashboard();
+}
+
+// -------------------------------------------------------------
+// INICIALIZACIÓN
+// -------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  navigate('dashboard');
+});
