@@ -192,11 +192,15 @@ async function loadSelectObjetos() {
 async function registrarPrestamo(event) {
   event.preventDefault();
 
+  const inputFecha = document.getElementById('p-fecha')?.value;
+  // Convertir a YYYY-MM-DD independientemente del formato del navegador
+  const fechaFormateada = inputFecha ? new Date(inputFecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
   const prestamoData = {
-    objeto_id: document.getElementById('p-objeto')?.value,
+    objeto_id: parseInt(document.getElementById('p-objeto')?.value, 10),
     solicitante: document.getElementById('p-solicitante')?.value,
     rol: document.getElementById('p-rol')?.value,
-    fecha_prestamo: document.getElementById('p-fecha')?.value || new Date().toISOString().split('T')[0]
+    fecha_prestamo: fechaFormateada
   };
 
   try {

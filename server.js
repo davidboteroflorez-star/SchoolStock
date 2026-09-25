@@ -95,31 +95,49 @@ app.get('/api/prestamos', async (req, res) => {
   }
 });
 
-// 5. Registrar préstamo
+// 5. Registrar préstamo (Corregido)
 app.post('/api/prestamos', async (req, res) => {
   const { objeto_id, solicitante, rol, fecha_prestamo } = req.body;
 
+  // Convertimos a entero para asegurar compatibilidad con PostgreSQL
+  const idObjetoNum = parseInt(objeto_id, 10);
+
+  if (isNaN(idObjetoNum)) {
+    return res.status(400).json({ error: 'Debe seleccionar un objeto válido.' });
+  }
+
   try {
-    const objCheck = await pool.query('SELECT cantidad_disponible FROM objetos WHERE id = $1', [objeto_id]);
-    if (objCheck.rows.length === 0 || objCheck.rows[0].cantidad_disponible <= 0) {
-      return res.status(400).json({ error: 'El objeto no está disponible para préstamo.' });
+    // Verificar si el objeto existe y tiene disponibilidad
+    const objCheck = await pool.query('SELECT cantidad_disponible FROM objetos WHERE id = $1', [idObjetoNum]);
+    
+    if (objCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'El objeto seleccionado no existe.' });
     }
 
+    if (objCheck.rows[0].cantidad_disponible <= 0) {
+      return res.status(400).json({ error: 'El objeto no cuenta con unidades disponibles para préstamo.' });
+    }
+
+    // Asegurar formato de fecha YYYY-MM-DD
+    const fechaValida = fecha_prestamo || new Date().toISOString().split('T')[0];
+
+    // Registrar el préstamo
     await pool.query(
       `INSERT INTO prestamos (objeto_id, solicitante, rol, fecha_prestamo, estado)
        VALUES ($1, $2, $3, $4, 'Activo')`,
-      [objeto_id, solicitante, rol, fecha_prestamo]
+      [idObjetoNum, solicitante, rol, fechaValida]
     );
 
+    // Descontar 1 unidad en la disponibilidad del objeto
     await pool.query(
       'UPDATE objetos SET cantidad_disponible = cantidad_disponible - 1 WHERE id = $1',
-      [objeto_id]
+      [idObjetoNum]
     );
 
     res.status(201).json({ message: 'Préstamo registrado exitosamente.' });
   } catch (err) {
     console.error("Error al registrar préstamo:", err);
-    res.status(500).json({ error: 'Error al procesar el préstamo.' });
+    res.status(500).json({ error: 'Error al procesar el préstamo en la base de datos: ' + err.message });
   }
 });
 
