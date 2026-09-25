@@ -13,7 +13,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware para verificación de clave de administrador
+// Middleware para verificar clave de administrador
 function verificarAdmin(req, res, next) {
   const passwordHeader = req.headers['x-admin-password'];
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -29,7 +29,7 @@ function verificarAdmin(req, res, next) {
 // RUTAS DE LA API (/api)
 // -------------------------------------------------------------
 
-// Obtener todos los objetos del inventario
+// 1. Obtener objetos
 app.get('/api/objetos', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
@@ -40,7 +40,7 @@ app.get('/api/objetos', async (req, res) => {
   }
 });
 
-// Crear objeto (Protegido por clave)
+// 2. Crear objeto (Protegido)
 app.post('/api/objetos', verificarAdmin, async (req, res) => {
   const { codigo, nombre, categoria, cantidad_total, ubicacion } = req.body;
   const cantidad = parseInt(cantidad_total) || 1;
@@ -58,19 +58,28 @@ app.post('/api/objetos', verificarAdmin, async (req, res) => {
   }
 });
 
-// Eliminar objeto (Protegido por clave)
+// 3. Eliminar objeto (Protegido - Elimina préstamos asociados primero)
 app.delete('/api/objetos/:id', verificarAdmin, async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query('DELETE FROM objetos WHERE id = $1', [id]);
+    // 1. Borrar préstamos relacionados para evitar el bloqueo de Foreign Key
+    await pool.query('DELETE FROM prestamos WHERE objeto_id = $1', [id]);
+    
+    // 2. Borrar el objeto
+    const result = await pool.query('DELETE FROM objetos WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'El objeto no existe o ya fue eliminado.' });
+    }
+
     res.json({ message: 'Objeto eliminado correctamente.' });
   } catch (err) {
     console.error("Error al eliminar objeto:", err);
-    res.status(500).json({ error: 'Error al eliminar el objeto.' });
+    res.status(500).json({ error: 'Error interno al intentar eliminar el objeto.' });
   }
 });
 
-// Obtener préstamos
+// 4. Obtener préstamos
 app.get('/api/prestamos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -86,7 +95,7 @@ app.get('/api/prestamos', async (req, res) => {
   }
 });
 
-// Registrar préstamo
+// 5. Registrar préstamo
 app.post('/api/prestamos', async (req, res) => {
   const { objeto_id, solicitante, rol, fecha_prestamo } = req.body;
 
@@ -114,7 +123,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// Registrar devolución
+// 6. Registrar devolución
 app.put('/api/prestamos/:id/devolucion', async (req, res) => {
   const { id } = req.params;
   const fechaHoy = new Date().toISOString().split('T')[0];
