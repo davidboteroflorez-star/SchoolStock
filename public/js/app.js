@@ -1,40 +1,45 @@
-let currentTab = 'dashboard';
-
 // Navegación entre pestañas
 function navigate(tabId) {
-  currentTab = tabId;
-
-  document.querySelectorAll('.tab-content').forEach(section => {
+  // Ocultar todas las secciones
+  const sections = document.querySelectorAll('.tab-content');
+  sections.forEach(section => {
+    section.classList.remove('active');
     section.style.display = 'none';
   });
 
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
+  // Quitar estado activo a todos los botones
+  const buttons = document.querySelectorAll('.nav-btn');
+  buttons.forEach(btn => btn.classList.remove('active'));
 
-  const selectedTab = document.getElementById(tabId);
-  if (selectedTab) {
-    selectedTab.style.display = 'block';
+  // Mostrar la sección elegida
+  const targetSection = document.getElementById(tabId);
+  if (targetSection) {
+    targetSection.classList.add('active');
+    targetSection.style.display = 'block';
   }
 
-  const selectedBtn = document.getElementById(`btn-${tabId}`);
-  if (selectedBtn) {
-    selectedBtn.classList.add('active');
+  // Activar el botón correspondiente
+  const targetBtn = document.getElementById(`btn-${tabId}`);
+  if (targetBtn) {
+    targetBtn.classList.add('active');
   }
 
-  // Cargar datos según la pestaña
+  // Cargar los datos del backend según la pestaña
   if (tabId === 'dashboard') {
     loadDashboard();
   } else if (tabId === 'inventario') {
     loadInventario();
   } else if (tabId === 'prestamo') {
     loadSelectObjetos();
+    // Establecer fecha de hoy por defecto
+    const fechaInput = document.getElementById('p-fecha');
+    if (fechaInput) fechaInput.value = new Date().toISOString().split('T')[0];
   } else if (tabId === 'historial') {
     loadHistorial();
   }
 }
 
-// Mostrar alertas
+// Ventana flotante de alertas
 function showAlert(message, isError = false) {
   const alertBox = document.getElementById('alert-box');
   if (!alertBox) {
@@ -50,7 +55,7 @@ function showAlert(message, isError = false) {
   }, 4000);
 }
 
-// Abrir/Cerrar Modal
+// Modal para nuevo objeto
 function toggleModal(show) {
   const modal = document.getElementById('modal-objeto');
   if (modal) {
@@ -58,14 +63,13 @@ function toggleModal(show) {
   }
 }
 
-// Guardar Objeto (Pide la clave 1 SOLA VEZ)
+// Guardar objeto (Solicita clave de admin 1 sola vez)
 async function guardarObjeto(event) {
   event.preventDefault();
 
-  const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
-
+  const adminPassword = prompt("Ingrese la clave de administrador para registrar el objeto:");
   if (!adminPassword) {
-    showAlert("Acceso denegado. Se requiere clave de administrador.", true);
+    showAlert("Operación cancelada. Se requiere clave de administrador.", true);
     return;
   }
 
@@ -105,10 +109,11 @@ async function guardarObjeto(event) {
   }
 }
 
-// Cargar tabla de Inventario
+// Cargar Inventario
 async function loadInventario() {
   try {
     const res = await fetch('/api/objetos');
+    if (!res.ok) return;
     const data = await res.json();
     const tbody = document.getElementById('tabla-inventario');
     if (!tbody) return;
@@ -122,11 +127,11 @@ async function loadInventario() {
       <tr>
         <td><strong>${o.codigo}</strong></td>
         <td>${o.nombre}</td>
-        <td><span class="badge">${o.categoria}</span></td>
+        <td><span class="badge badge-success">${o.categoria}</span></td>
         <td>${o.cantidad_disponible} / ${o.cantidad_total}</td>
         <td>${o.ubicacion}</td>
         <td>
-          <button class="btn btn-sm" onclick="eliminarObjeto(${o.id})" style="background: #ef4444;">Eliminar</button>
+          <button class="btn btn-sm btn-danger" onclick="eliminarObjeto(${o.id})">Eliminar</button>
         </td>
       </tr>
     `).join('');
@@ -135,7 +140,7 @@ async function loadInventario() {
   }
 }
 
-// Eliminar un objeto
+// Eliminar objeto
 async function eliminarObjeto(id) {
   const adminPassword = prompt("Ingrese la clave de administrador para eliminar:");
   if (!adminPassword) return;
@@ -159,10 +164,11 @@ async function eliminarObjeto(id) {
   }
 }
 
-// Cargar opciones en el select de préstamos
+// Cargar objetos en el selector de préstamo
 async function loadSelectObjetos() {
   try {
     const res = await fetch('/api/objetos');
+    if (!res.ok) return;
     const data = await res.json();
     const select = document.getElementById('p-objeto');
 
@@ -238,6 +244,7 @@ async function registrarDevolucion(id) {
 async function loadHistorial() {
   try {
     const res = await fetch('/api/prestamos');
+    if (!res.ok) return;
     const data = await res.json();
     const tbody = document.getElementById('tabla-historial');
     if (!tbody) return;
@@ -275,32 +282,35 @@ async function loadHistorial() {
 async function loadDashboard() {
   try {
     const resObj = await fetch('/api/objetos');
-    const objetos = await resObj.json();
-
     const resPres = await fetch('/api/prestamos');
-    const prestamos = await resPres.json();
 
-    if (Array.isArray(objetos)) {
-      const total = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_total) || 0), 0);
-      const disp = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_disponible) || 0), 0);
-      
-      const elTotal = document.getElementById('stat-total');
-      const elDisp = document.getElementById('stat-disponibles');
-      if (elTotal) elTotal.textContent = total;
-      if (elDisp) elDisp.textContent = disp;
+    if (resObj.ok) {
+      const objetos = await resObj.json();
+      if (Array.isArray(objetos)) {
+        const total = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_total) || 0), 0);
+        const disp = objetos.reduce((acc, o) => acc + (parseInt(o.cantidad_disponible) || 0), 0);
+        
+        const elTotal = document.getElementById('stat-total');
+        const elDisp = document.getElementById('stat-disponibles');
+        if (elTotal) elTotal.textContent = total;
+        if (elDisp) elDisp.textContent = disp;
+      }
     }
 
-    if (Array.isArray(prestamos)) {
-      const activos = prestamos.filter(p => p.estado === 'Activo').length;
-      const elActivos = document.getElementById('stat-activos');
-      if (elActivos) elActivos.textContent = activos;
+    if (resPres.ok) {
+      const prestamos = await resPres.json();
+      if (Array.isArray(prestamos)) {
+        const activos = prestamos.filter(p => p.estado === 'Activo').length;
+        const elActivos = document.getElementById('stat-activos');
+        if (elActivos) elActivos.textContent = activos;
+      }
     }
   } catch (err) {
     console.error("Error al cargar dashboard:", err);
   }
 }
 
-// Cargar Dashboard al iniciar
+// Inicialización
 document.addEventListener('DOMContentLoaded', () => {
   navigate('dashboard');
 });
