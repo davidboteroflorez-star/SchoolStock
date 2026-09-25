@@ -318,3 +318,87 @@ async function loadDashboard() {
 document.addEventListener('DOMContentLoaded', () => {
   navigate('dashboard');
 });
+// Función auxiliar para dar formato a fecha y hora
+function formatFechaHora(fechaStr) {
+  if (!fechaStr) return 'Pendiente';
+  const fecha = new Date(fechaStr);
+  if (isNaN(fecha.getTime())) return fechaStr;
+
+  return fecha.toLocaleString('es-CO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+// Cargar Historial mostrando fecha y hora
+async function loadHistorial() {
+  try {
+    const res = await fetch('/api/prestamos');
+    if (!res.ok) return;
+    const data = await res.json();
+    const tbody = document.getElementById('tabla-historial');
+    if (!tbody) return;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay préstamos registrados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${p.objeto_nombre || 'N/A'}</td>
+        <td>${p.solicitante} (${p.rol})</td>
+        <td>${formatFechaHora(p.fecha_prestamo)}</td>
+        <td>${formatFechaHora(p.fecha_devolucion)}</td>
+        <td>
+          <span class="badge ${p.estado === 'Devuelto' ? 'badge-success' : 'badge-warning'}">
+            ${p.estado}
+          </span>
+        </td>
+        <td>
+          ${p.estado === 'Activo' 
+            ? `<button class="btn btn-sm" onclick="registrarDevolucion(${p.id})">Devolver</button>` 
+            : '-'
+          }
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error("Error al cargar historial:", err);
+  }
+}
+
+// Registrar Préstamo
+async function registrarPrestamo(event) {
+  event.preventDefault();
+
+  const prestamoData = {
+    objeto_id: parseInt(document.getElementById('p-objeto')?.value, 10),
+    solicitante: document.getElementById('p-solicitante')?.value,
+    rol: document.getElementById('p-rol')?.value
+  };
+
+  try {
+    const res = await fetch('/api/prestamos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prestamoData)
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showAlert('Préstamo registrado exitosamente');
+      document.getElementById('form-prestamo').reset();
+      navigate('historial');
+    } else {
+      showAlert(data.error || 'Error al registrar préstamo', true);
+    }
+  } catch (err) {
+    showAlert('Error de conexión al registrar préstamo', true);
+  }
+}

@@ -95,11 +95,9 @@ app.get('/api/prestamos', async (req, res) => {
   }
 });
 
-// 5. Registrar préstamo (Corregido)
+// 5. Registrar préstamo con fecha y hora exactas
 app.post('/api/prestamos', async (req, res) => {
-  const { objeto_id, solicitante, rol, fecha_prestamo } = req.body;
-
-  // Convertimos a entero para asegurar compatibilidad con PostgreSQL
+  const { objeto_id, solicitante, rol } = req.body;
   const idObjetoNum = parseInt(objeto_id, 10);
 
   if (isNaN(idObjetoNum)) {
@@ -107,7 +105,6 @@ app.post('/api/prestamos', async (req, res) => {
   }
 
   try {
-    // Verificar si el objeto existe y tiene disponibilidad
     const objCheck = await pool.query('SELECT cantidad_disponible FROM objetos WHERE id = $1', [idObjetoNum]);
     
     if (objCheck.rows.length === 0) {
@@ -118,17 +115,13 @@ app.post('/api/prestamos', async (req, res) => {
       return res.status(400).json({ error: 'El objeto no cuenta con unidades disponibles para préstamo.' });
     }
 
-    // Asegurar formato de fecha YYYY-MM-DD
-    const fechaValida = fecha_prestamo || new Date().toISOString().split('T')[0];
-
-    // Registrar el préstamo
+    // Insertar usando NOW() para guardar fecha y hora del servidor
     await pool.query(
       `INSERT INTO prestamos (objeto_id, solicitante, rol, fecha_prestamo, estado)
-       VALUES ($1, $2, $3, $4, 'Activo')`,
-      [idObjetoNum, solicitante, rol, fechaValida]
+       VALUES ($1, $2, $3, NOW(), 'Activo')`,
+      [idObjetoNum, solicitante, rol]
     );
 
-    // Descontar 1 unidad en la disponibilidad del objeto
     await pool.query(
       'UPDATE objetos SET cantidad_disponible = cantidad_disponible - 1 WHERE id = $1',
       [idObjetoNum]
@@ -138,6 +131,38 @@ app.post('/api/prestamos', async (req, res) => {
   } catch (err) {
     console.error("Error al registrar préstamo:", err);
     res.status(500).json({ error: 'Error al procesar el préstamo en la base de datos: ' + err.message });
+  }
+});
+
+// 6. Registrar devolución con fecha y hora exactas
+app.put('/api/prestamos/:id/devolucion', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const prestamoRes = await pool.query('SELECT * FROM prestamos WHERE id = $1', [id]);
+    if (prestamoRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Préstamo no encontrado.' });
+    }
+
+    const prestamo = prestamoRes.rows[0];
+    if (prestamo.estado === 'Devuelto') {
+      return res.status(400).json({ error: 'El préstamo ya fue devuelto previamente.' });
+    }
+
+    await pool.query(
+      "UPDATE prestamos SET estado = 'Devuelto', fecha_devolucion = NOW() WHERE id = $2",
+      [id]
+    );
+
+    await pool.query(
+      'UPDATE objetos SET cantidad_disponible = cantidad_disponible + 1 WHERE id = $1',
+      [prestamo.objeto_id]
+    );
+
+    res.json({ message: 'Devolución registrada exitosamente.' });
+  } catch (err) {
+    console.error("Error en devolución:", err);
+    res.status(500).json({ error: 'Error al registrar la devolución.' });
   }
 });
 
