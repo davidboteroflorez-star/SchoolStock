@@ -1,47 +1,40 @@
-// Variable para rastrear la pestaña activa
 let currentTab = 'dashboard';
 
-// Navegación entre secciones (Tabs)
+// Navegación entre pestañas
 function navigate(tabId) {
   currentTab = tabId;
 
-  // Ocultar todas las secciones
   document.querySelectorAll('.tab-content').forEach(section => {
     section.style.display = 'none';
   });
 
-  // Remover clase activa de todos los botones
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.remove('active');
   });
 
-  // Mostrar la sección seleccionada
   const selectedTab = document.getElementById(tabId);
   if (selectedTab) {
     selectedTab.style.display = 'block';
   }
 
-  // Activar el botón correspondiente
   const selectedBtn = document.getElementById(`btn-${tabId}`);
   if (selectedBtn) {
     selectedBtn.classList.add('active');
   }
 
-  // Cargar datos según la pestaña activa
+  // Cargar datos según la pestaña
   if (tabId === 'dashboard') {
-    if (typeof loadDashboard === 'function') loadDashboard();
-    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+    loadDashboard();
   } else if (tabId === 'inventario') {
-    if (typeof loadInventario === 'function') loadInventario();
-    if (typeof cargarObjetos === 'function') cargarObjetos();
+    loadInventario();
   } else if (tabId === 'prestamo') {
-    if (typeof loadSelectObjetos === 'function') loadSelectObjetos();
+    loadSelectObjetos();
   } else if (tabId === 'historial') {
-    if (typeof loadHistorial === 'function') loadHistorial();
+    loadHistorial();
   }
 }
 
-// Mostrar avisos/alertas en pantalla
+// Mostrar alertas
 function showAlert(message, isError = false) {
   const alertBox = document.getElementById('alert-box');
   if (!alertBox) {
@@ -57,7 +50,7 @@ function showAlert(message, isError = false) {
   }, 4000);
 }
 
-// Control del Modal para Agregar Objeto
+// Abrir/Cerrar Modal
 function toggleModal(show) {
   const modal = document.getElementById('modal-objeto');
   if (modal) {
@@ -65,15 +58,10 @@ function toggleModal(show) {
   }
 }
 
-// -------------------------------------------------------------
-// GESTIÓN DE OBJETOS (INVENTARIO)
-// -------------------------------------------------------------
-
-// Guardar Objeto en el Inventario (Protegido por Clave - Pide clave 1 SOLA VEZ)
+// Guardar Objeto (Pide la clave 1 SOLA VEZ)
 async function guardarObjeto(event) {
   event.preventDefault();
 
-  // 1. Pedir clave de administrador una sola vez
   const adminPassword = prompt("Ingrese la clave de administrador para registrar un objeto:");
 
   if (!adminPassword) {
@@ -81,7 +69,6 @@ async function guardarObjeto(event) {
     return;
   }
 
-  // 2. Extraer los datos del formulario
   const objetoData = {
     codigo: document.getElementById('o-codigo')?.value || '',
     nombre: document.getElementById('o-nombre')?.value || '',
@@ -91,7 +78,6 @@ async function guardarObjeto(event) {
   };
 
   try {
-    // 3. Enviar la petición a la API enviando la clave en el header x-admin-password
     const response = await fetch('/api/objetos', {
       method: 'POST',
       headers: {
@@ -107,16 +93,11 @@ async function guardarObjeto(event) {
       throw new Error(data.error || 'Error al guardar el objeto');
     }
 
-    // 4. Éxito: Limpiar formulario, cerrar modal y refrescar la tabla/dashboard
     showAlert("Objeto registrado exitosamente.");
     document.getElementById('form-objeto').reset();
     toggleModal(false);
-
-    // Refrescar vistas
-    if (typeof loadInventario === 'function') loadInventario();
-    if (typeof cargarObjetos === 'function') cargarObjetos();
-    if (typeof loadDashboard === 'function') loadDashboard();
-    if (typeof cargarEstadisticas === 'function') cargarEstadisticas();
+    loadInventario();
+    loadDashboard();
 
   } catch (error) {
     console.error("Error en guardarObjeto:", error);
@@ -154,12 +135,7 @@ async function loadInventario() {
   }
 }
 
-// Función alias para compatibilidad
-async function cargarObjetos() {
-  await loadInventario();
-}
-
-// Eliminar un objeto del inventario
+// Eliminar un objeto
 async function eliminarObjeto(id) {
   const adminPassword = prompt("Ingrese la clave de administrador para eliminar:");
   if (!adminPassword) return;
@@ -183,11 +159,7 @@ async function eliminarObjeto(id) {
   }
 }
 
-// -------------------------------------------------------------
-// GESTIÓN DE PRÉSTAMOS
-// -------------------------------------------------------------
-
-// Cargar Selección de Objetos Disponibles en el Formulario de Préstamo
+// Cargar opciones en el select de préstamos
 async function loadSelectObjetos() {
   try {
     const res = await fetch('/api/objetos');
@@ -210,7 +182,7 @@ async function loadSelectObjetos() {
   }
 }
 
-// Registrar un Préstamo
+// Registrar Préstamo
 async function registrarPrestamo(event) {
   event.preventDefault();
 
@@ -262,7 +234,7 @@ async function registrarDevolucion(id) {
   }
 }
 
-// Cargar Historial de Préstamos
+// Cargar Historial
 async function loadHistorial() {
   try {
     const res = await fetch('/api/prestamos');
@@ -299,11 +271,7 @@ async function loadHistorial() {
   }
 }
 
-// -------------------------------------------------------------
-// DASHBOARD / ESTADÍSTICAS
-// -------------------------------------------------------------
-
-// Cargar Métricas en el Dashboard
+// Cargar métricas del Dashboard
 async function loadDashboard() {
   try {
     const resObj = await fetch('/api/objetos');
@@ -332,14 +300,7 @@ async function loadDashboard() {
   }
 }
 
-// Alias de compatibilidad
-async function cargarEstadisticas() {
-  await loadDashboard();
-}
-
-// -------------------------------------------------------------
-// INICIALIZACIÓN
-// -------------------------------------------------------------
+// Cargar Dashboard al iniciar
 document.addEventListener('DOMContentLoaded', () => {
   navigate('dashboard');
 });

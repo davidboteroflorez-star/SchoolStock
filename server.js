@@ -4,19 +4,16 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// Middleware para procesar JSON en el cuerpo de las peticiones
 app.use(express.json());
-
-// Servir archivos estáticos de la carpeta public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de la base de datos PostgreSQL (Neon)
+// Configuración de PostgreSQL (Neon)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Middleware para verificar clave de administrador en rutas protegidas
+// Middleware para verificación de clave de administrador
 function verificarAdmin(req, res, next) {
   const passwordHeader = req.headers['x-admin-password'];
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -32,7 +29,7 @@ function verificarAdmin(req, res, next) {
 // RUTAS DE LA API (/api)
 // -------------------------------------------------------------
 
-// 1. Obtener todos los objetos del inventario
+// Obtener todos los objetos del inventario
 app.get('/api/objetos', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM objetos ORDER BY id DESC');
@@ -43,7 +40,7 @@ app.get('/api/objetos', async (req, res) => {
   }
 });
 
-// 2. Crear un nuevo objeto (Protegido por Clave)
+// Crear objeto (Protegido por clave)
 app.post('/api/objetos', verificarAdmin, async (req, res) => {
   const { codigo, nombre, categoria, cantidad_total, ubicacion } = req.body;
   const cantidad = parseInt(cantidad_total) || 1;
@@ -61,7 +58,7 @@ app.post('/api/objetos', verificarAdmin, async (req, res) => {
   }
 });
 
-// 3. Eliminar un objeto (Protegido por Clave)
+// Eliminar objeto (Protegido por clave)
 app.delete('/api/objetos/:id', verificarAdmin, async (req, res) => {
   const { id } = req.params;
   try {
@@ -73,7 +70,7 @@ app.delete('/api/objetos/:id', verificarAdmin, async (req, res) => {
   }
 });
 
-// 4. Obtener todos los préstamos
+// Obtener préstamos
 app.get('/api/prestamos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -89,25 +86,22 @@ app.get('/api/prestamos', async (req, res) => {
   }
 });
 
-// 5. Registrar un nuevo préstamo
+// Registrar préstamo
 app.post('/api/prestamos', async (req, res) => {
   const { objeto_id, solicitante, rol, fecha_prestamo } = req.body;
 
   try {
-    // Verificar disponibilidad
     const objCheck = await pool.query('SELECT cantidad_disponible FROM objetos WHERE id = $1', [objeto_id]);
     if (objCheck.rows.length === 0 || objCheck.rows[0].cantidad_disponible <= 0) {
       return res.status(400).json({ error: 'El objeto no está disponible para préstamo.' });
     }
 
-    // Insertar préstamo
     await pool.query(
       `INSERT INTO prestamos (objeto_id, solicitante, rol, fecha_prestamo, estado)
        VALUES ($1, $2, $3, $4, 'Activo')`,
       [objeto_id, solicitante, rol, fecha_prestamo]
     );
 
-    // Reducir cantidad disponible
     await pool.query(
       'UPDATE objetos SET cantidad_disponible = cantidad_disponible - 1 WHERE id = $1',
       [objeto_id]
@@ -120,7 +114,7 @@ app.post('/api/prestamos', async (req, res) => {
   }
 });
 
-// 6. Registrar devolución de un objeto
+// Registrar devolución
 app.put('/api/prestamos/:id/devolucion', async (req, res) => {
   const { id } = req.params;
   const fechaHoy = new Date().toISOString().split('T')[0];
@@ -136,13 +130,11 @@ app.put('/api/prestamos/:id/devolucion', async (req, res) => {
       return res.status(400).json({ error: 'El préstamo ya fue devuelto previamente.' });
     }
 
-    // Actualizar estado del préstamo
     await pool.query(
       "UPDATE prestamos SET estado = 'Devuelto', fecha_devolucion = $1 WHERE id = $2",
       [fechaHoy, id]
     );
 
-    // Incrementar cantidad disponible
     await pool.query(
       'UPDATE objetos SET cantidad_disponible = cantidad_disponible + 1 WHERE id = $1',
       [prestamo.objeto_id]
@@ -155,19 +147,13 @@ app.put('/api/prestamos/:id/devolucion', async (req, res) => {
   }
 });
 
-// Ruta fallback para servir el frontend SPA
+// Ruta fallback SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// -------------------------------------------------------------
-// EXPORTACIÓN Y PUERTO
-// -------------------------------------------------------------
-
-// Exportar app para Vercel Serverless Functions
 module.exports = app;
 
-// Escuchar puerto únicamente en entorno local (No en producción/Vercel)
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`Servidor local ejecutándose en puerto ${PORT}`));
